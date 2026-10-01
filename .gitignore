@@ -47,3 +47,18 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+.Rproj.user/
+.Rhistory
+.RData
+.RDataTmp
+.Renviron
+.DS_Store
+.quarto/
+*_cache/
+rsconnect/
+
+# Exclude CSVs except the two public synthetic datasets
+*.csv
+!basil_synthetic_demo.csv
+!basil_synthetic_demo_updated.csv
