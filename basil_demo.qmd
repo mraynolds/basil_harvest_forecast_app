@@ -1,0 +1,103 @@
+---
+title: "Basil Forecast: Synthetic Demonstration"
+author: "Maxfield Raynolds"
+format: html
+editor: visual
+---
+
+```{r}
+#| include: false
+library('fpp3')
+library('tidyverse')
+
+source('R/forecast_pipeline.R')
+```
+
+In order to demonstrate the functions of the app and forecast, functions from the forecast_pipeline are used in this quarto document. The synthetic data is loaded into the environment below.
+
+```{r}
+#| message: false
+issue_date <- as.Date('2026-09-29')
+model_start <- as.Date('2021-07-26')
+
+demo_raw <- read_csv('basil_synthetic_demo.csv',
+                     col_types = readr::cols(
+                       HarvestDate = readr::col_date(format = '%Y-%m-%d'),
+                       LineNumber = readr::col_double(),
+                       ProductID = readr::col_double(),
+                       AvgHeadweight = readr::col_double()
+                     )
+)
+```
+
+Invalid weights are flagged.
+
+```{r}
+invalid_weights <- find_invalid_weights(demo_raw)
+```
+
+Flagged weights are replaced with missing values; the original records and weights are retained.
+
+```{r}
+demo_clean <- clean_basil_weights(demo_raw, invalid_weights)
+```
+
+The cutoff date for the data to be used in forecasting is applied, and the observations are aggregated.
+
+```{r}
+demo_weekly <- prepare_basil_weekly(demo_clean, issue_date)
+```
+
+The forecast applies the modeling start date.
+
+```{r}
+demo_forecast <- forecast_basil(
+  demo_weekly,
+  issue_date,
+  model_start
+)
+```
+
+Then it is prepped for display.
+
+```{r}
+demo_display <- make_forecast_display(demo_forecast)
+```
+
+The table below enumerates the forecast and the lower and upper bounds of an 80% and 95% prediction interval.
+
+```{r}
+#| echo: false
+demo_display |> 
+  transmute(
+    `Harvest week starting` = as.character(as.Date(week)),
+    `Forecast (g)` = .mean,
+    `80% lower` = lower80,
+    `80% upper` = upper80,
+    `95% lower` = lower95,
+    `95% upper` = upper95
+  ) |> 
+  knitr::kable(digits = 1)
+```
+
+The same table information is plotted below.
+
+```{r}
+#| echo: false
+demo_display |> 
+  mutate(
+    week_start = as.Date(week)
+  ) |> 
+  ggplot(aes(x = week_start)) + 
+  geom_ribbon(aes(ymin = lower95, ymax = upper95), fill = 'orange', alpha = 0.15) + 
+  geom_ribbon(aes(ymin = lower80, ymax = upper80), fill = 'orange', alpha = 0.30) +
+  geom_line(aes(y = .mean)) +
+  labs(
+    x = 'Harvest week starting',
+    y = 'Reported head-weight index (g)',
+    title = 'Basil Forecast Synthetic Data',
+    subtitle = 'Darker band: 80% prediction interval; lighter band: 95%'
+  )
+```
+
+The flat prediction is expected. The naive model uses the latest observed weekly index for every future week. The widening bands represent model-based prediction intervals. These synthetic results demonstrate the workflow, not operational forecast accuracy. The index is an approximation based on reported sample averages and does not estimate total production.
